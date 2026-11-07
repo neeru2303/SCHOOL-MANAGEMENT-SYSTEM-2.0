@@ -34,3 +34,9 @@ Thumbs.db
 *.key
 *.p12
 *.jks
+
+# Generated Prisma Client
+apps/backend/src/generated/prisma/
+
+# TypeScript build cache
+*.tsbuildinfo
