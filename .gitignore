@@ -1,0 +1,36 @@
+# Node.js
+node_modules/
+dist/
+coverage/
+*.log
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets and certificates
+*.pem
+*.key
+*.p12
+*.jks
