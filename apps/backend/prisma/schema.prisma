@@ -6,3 +6,332 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum SchoolStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+  INVITED
+}
+
+enum PermissionScope {
+  PLATFORM
+  SCHOOL
+}
+
+enum RoleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AuthSessionType {
+  SCHOOL
+  PLATFORM
+}
+
+// ==========================================
+// USER
+// Global identity of a person
+// ==========================================
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  firstName String
+  lastName  String?
+
+  email        String? @unique
+  phone        String?
+  passwordHash String?
+
+  status UserStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  membership    SchoolMembership?
+  sessions      AuthSession[]
+  platformRoles PlatformUserRole[]
+}
+
+// ==========================================
+// SCHOOL
+// Main school organization
+// ==========================================
+
+model School {
+  id String @id @default(uuid()) @db.Uuid
+
+  name String
+  code String @unique
+
+  status SchoolStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branches    Branch[]
+  memberships SchoolMembership[]
+  roles       SchoolRole[]
+}
+
+// ==========================================
+// BRANCH
+// Optional school branches
+// ==========================================
+
+model Branch {
+  id String @id @default(uuid()) @db.Uuid
+
+  schoolId String @db.Uuid
+
+  name String
+  code String
+
+  status BranchStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  memberships BranchMembership[]
+
+  // Required for composite foreign-key relationships.
+  @@unique([id, schoolId])
+  // Branch codes must be unique within their school.
+  @@unique([schoolId, code])
+  @@index([schoolId, status])
+}
+
+// ==========================================
+// SCHOOL MEMBERSHIP
+// A normal user belongs to only one school.
+// ==========================================
+
+model SchoolMembership {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId   String @unique @db.Uuid
+  schoolId String @db.Uuid
+
+  status MembershipStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  branchAssignments BranchMembership[]
+  roles             MembershipRole[]
+  branchRoles       BranchMembershipRole[]
+
+  // Supports school-safe composite relationships.
+  @@unique([id, schoolId])
+  @@index([schoolId, status])
+}
+
+// ==========================================
+// BRANCH MEMBERSHIP
+// Optional branch assignments for users.
+// ==========================================
+
+model BranchMembership {
+  membershipId String @db.Uuid
+  branchId     String @db.Uuid
+  schoolId     String @db.Uuid
+
+  createdAt       DateTime               @default(now())
+  roleAssignments BranchMembershipRole[]
+  membership      SchoolMembership       @relation(fields: [membershipId, schoolId], references: [id, schoolId], onDelete: Cascade)
+  branch          Branch                 @relation(fields: [branchId, schoolId], references: [id, schoolId], onDelete: Cascade)
+
+  // A membership cannot be assigned twice to the same branch.
+  @@id([membershipId, branchId])
+  @@index([schoolId, branchId])
+}
+
+// ==========================================
+// AUTHENTICATION SESSION
+// One record represents one authenticated device.
+// ==========================================
+
+model AuthSession {
+  id               String          @id @default(uuid()) @db.Uuid
+  userId           String          @db.Uuid
+  refreshTokenHash String          @unique @db.VarChar(64)
+  sessionType      AuthSessionType @default(SCHOOL)
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastUsedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@index([sessionType, expiresAt])
+}
+
+// ==========================================
+// PERMISSION CATALOGUE
+// Global list of available permissions
+// ==========================================
+
+model Permission {
+  id          String          @id @default(uuid()) @db.Uuid
+  code        String          @unique @db.VarChar(120)
+  name        String
+  description String?
+  scope       PermissionScope
+
+  createdAt DateTime @default(now())
+
+  rolePermissions         RolePermission[]
+  platformRolePermissions PlatformRolePermission[]
+
+  @@index([scope])
+}
+
+// ==========================================
+// SCHOOL ROLES
+// Roles belonging to individual schools
+// ==========================================
+
+model SchoolRole {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+
+  code        String  @db.VarChar(80)
+  name        String
+  description String?
+
+  status   RoleStatus @default(ACTIVE)
+  isSystem Boolean    @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  permissions RolePermission[]
+
+  membershipAssignments MembershipRole[]
+  branchAssignments     BranchMembershipRole[]
+
+  @@unique([id, schoolId])
+  @@unique([schoolId, code])
+  @@index([schoolId, status])
+}
+
+// ==========================================
+// SCHOOL ROLE PERMISSIONS
+// ==========================================
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  createdAt DateTime @default(now())
+
+  role SchoolRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+// ==========================================
+// SCHOOL MEMBERSHIP ROLE ASSIGNMENT
+// School-wide role assignment
+// ==========================================
+
+model MembershipRole {
+  membershipId String   @db.Uuid
+  roleId       String   @db.Uuid
+  schoolId     String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  membership SchoolMembership @relation(fields: [membershipId, schoolId], references: [id, schoolId], onDelete: Cascade)
+  role       SchoolRole       @relation(fields: [roleId, schoolId], references: [id, schoolId], onDelete: Cascade)
+
+  @@id([membershipId, roleId])
+  @@index([schoolId, roleId])
+}
+
+model BranchMembershipRole {
+  membershipId String   @db.Uuid
+  branchId     String   @db.Uuid
+  roleId       String   @db.Uuid
+  schoolId     String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  branchMembership   BranchMembership  @relation(fields: [membershipId, branchId], references: [membershipId, branchId], onDelete: Cascade)
+  role               SchoolRole        @relation(fields: [roleId, schoolId], references: [id, schoolId], onDelete: Cascade)
+  schoolMembership   SchoolMembership? @relation(fields: [schoolMembershipId], references: [id])
+  schoolMembershipId String?           @db.Uuid
+
+  @@id([membershipId, branchId, roleId])
+  @@index([schoolId, roleId, branchId])
+}
+
+model PlatformRole {
+  id          String     @id @default(uuid()) @db.Uuid
+  code        String     @unique @db.VarChar(80)
+  name        String
+  description String?
+  status      RoleStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  permissions PlatformRolePermission[]
+  users       PlatformUserRole[]
+}
+
+model PlatformRolePermission {
+  roleId       String   @db.Uuid
+  permissionId String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  role       PlatformRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission   @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model PlatformUserRole {
+  userId    String   @db.Uuid
+  roleId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role PlatformRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}

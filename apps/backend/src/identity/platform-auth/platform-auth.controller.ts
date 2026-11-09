@@ -1,0 +1,70 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
+import { Request } from 'express';
+
+import { PlatformAuthService } from './platform-auth.service.js';
+import { PlatformAuthGuard } from './platform-auth.guard.js';
+
+import {
+  PlatformLoginDto,
+  PlatformRefreshTokenDto,
+} from './dto/platform-auth.dto.js';
+
+interface PlatformRequest extends Request {
+  user: {
+    userId: string;
+    sessionId: string;
+    email: string | null;
+    firstName: string;
+    lastName: string | null;
+    scope: 'PLATFORM';
+    roles: string[];
+    permissions: string[];
+  };
+}
+
+@Controller('platform/auth')
+export class PlatformAuthController {
+  constructor(
+    private readonly platformAuthService: PlatformAuthService,
+  ) {}
+
+  @Post('login')
+  async login(@Body() dto: PlatformLoginDto) {
+    return this.platformAuthService.login(
+      dto.email,
+      dto.password,
+    );
+  }
+
+  @Post('refresh')
+  async refresh(
+    @Body() dto: PlatformRefreshTokenDto,
+  ) {
+    return this.platformAuthService.refresh(
+      dto.refreshToken,
+    );
+  }
+
+  @UseGuards(PlatformAuthGuard)
+  @Post('logout')
+  async logout(@Req() request: PlatformRequest) {
+    return this.platformAuthService.logout(
+      request.user.userId,
+      request.user.sessionId,
+    );
+  }
+
+  @UseGuards(PlatformAuthGuard)
+  @Get('me')
+  async me(@Req() request: PlatformRequest) {
+    return request.user;
+  }
+}
