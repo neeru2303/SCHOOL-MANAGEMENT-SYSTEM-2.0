@@ -12,6 +12,48 @@ class PlatformUnlockScreen extends StatefulWidget {
 class _PlatformUnlockScreenState extends State<PlatformUnlockScreen> {
   final _pinController = TextEditingController();
   bool _loading = false;
+  bool _biometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricAvailability();
+  }
+
+  Future<void> _loadBiometricAvailability() async {
+    final available =
+        await PlatformAuthController.instance.canUseBiometricUnlock();
+    if (mounted) setState(() => _biometricAvailable = available);
+  }
+
+  Future<void> _unlockWithBiometrics() async {
+    setState(() => _loading = true);
+    try {
+      final unlocked =
+          await PlatformAuthController.instance.unlockWithBiometrics();
+      if (!unlocked && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Biometric authentication was cancelled. Use your MPIN.',
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.toString().replaceFirst('Exception: ', ''),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   Future<void> _unlock() async {
     if (!RegExp(r'^\d{6}$').hasMatch(_pinController.text)) {
@@ -133,6 +175,18 @@ class _PlatformUnlockScreenState extends State<PlatformUnlockScreen> {
                               : const Text('Unlock'),
                         ),
                       ),
+                      if (_biometricAvailable) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton.icon(
+                            onPressed: _loading ? null : _unlockWithBiometrics,
+                            icon: const Icon(Icons.fingerprint_rounded),
+                            label: const Text('Unlock with biometrics'),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       TextButton(
                         onPressed: _loading
