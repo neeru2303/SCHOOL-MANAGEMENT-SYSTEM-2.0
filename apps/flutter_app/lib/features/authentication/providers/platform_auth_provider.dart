@@ -137,8 +137,14 @@ class PlatformAuthController extends ChangeNotifier {
     await _storage.setRememberMe(true);
 
     if (enableBiometrics && await isBiometricAvailable()) {
-      await _storage.saveBiometricPin(pin);
-      await _storage.setBiometricEnabled(true);
+      try {
+        await _storage.saveBiometricPin(pin);
+        await _storage.setBiometricEnabled(true);
+      } catch (_) {
+        // Keep MPIN unlock available if the OS biometric setup is cancelled.
+        await _storage.deleteBiometricPin();
+        await _storage.setBiometricEnabled(false);
+      }
     } else {
       await _storage.deleteBiometricPin();
       await _storage.setBiometricEnabled(false);
