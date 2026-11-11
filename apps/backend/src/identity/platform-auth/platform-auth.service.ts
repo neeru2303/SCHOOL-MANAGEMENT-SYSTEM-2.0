@@ -470,6 +470,51 @@ export class PlatformAuthService {
     };
   }
 
+  async forgetDevice(deviceKey: string, refreshToken: string) {
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const device = await this.prisma.platformTrustedDevice.findUnique({
+      where: { deviceKey },
+    });
+    const session = await this.prisma.authSession.findFirst({
+      where: {
+        refreshTokenHash: tokenHash,
+        sessionType: 'PLATFORM',
+      },
+    });
+
+    if (
+      !device ||
+      !session ||
+      device.userId !== session.userId ||
+      device.sessionId !== session.id ||
+      device.revokedAt
+    ) {
+      throw new UnauthorizedException('Remembered device not found or already revoked.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.platformTrustedDevice.updateMany({
+        where: {
+          id: device.id,
+          sessionId: session.id,
+          revokedAt: null,
+        },
+        data: { revokedAt: new Date() },
+      });
+      await tx.authSession.updateMany({
+        where: {
+          id: session.id,
+          userId: session.userId,
+          sessionType: 'PLATFORM',
+          revokedAt: null,
+        },
+        data: { revokedAt: new Date(), lastUsedAt: new Date() },
+      });
+    });
+
+    return { message: 'Remembered device revoked. Sign in with your email and password.' };
+  }
+
   async logout(userId: string, sessionId: string) {
     await this.prisma.platformTrustedDevice.updateMany({
       where: { userId, sessionId, revokedAt: null },
