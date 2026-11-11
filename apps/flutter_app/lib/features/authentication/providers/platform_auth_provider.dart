@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 
 import '../../../core/storage/secure_token_storage.dart';
 import '../models/platform_user.dart';
@@ -112,7 +114,10 @@ class PlatformAuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> rememberCurrentDevice(String pin) async {
+  Future<void> rememberCurrentDevice(
+    String pin, {
+    bool enableBiometrics = false,
+  }) async {
     final accessToken = await _storage.getAccessToken();
     if (accessToken == null) {
       throw Exception('Your login session is no longer available.');
@@ -130,6 +135,58 @@ class PlatformAuthController extends ChangeNotifier {
 
     await _storage.saveTrustedDeviceKey(deviceKey);
     await _storage.setRememberMe(true);
+
+    if (enableBiometrics && await isBiometricAvailable()) {
+      await _storage.saveBiometricPin(pin);
+      await _storage.setBiometricEnabled(true);
+    } else {
+      await _storage.deleteBiometricPin();
+      await _storage.setBiometricEnabled(false);
+    }
+  }
+
+  bool get _isMobilePlatform =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  Future<bool> isBiometricAvailable() async {
+    if (!_isMobilePlatform) return false;
+    try {
+      final auth = LocalAuthentication();
+      return await auth.isDeviceSupported() && await auth.canCheckBiometrics;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> canUseBiometricUnlock() async {
+    if (!await _storage.shouldUseBiometrics()) return false;
+    if (!await isBiometricAvailable()) return false;
+    return await _storage.getBiometricPin() != null;
+  }
+
+  Future<bool> unlockWithBiometrics() async {
+    if (!await canUseBiometricUnlock()) return false;
+
+    final auth = LocalAuthentication();
+    final authenticated = await auth.authenticate(
+      localizedReason: 'Authenticate to unlock your School ERP platform session.',
+      options: const AuthenticationOptions(
+        biometricOnly: true,
+        stickyAuth: true,
+      ),
+    );
+
+    if (!authenticated) return false;
+
+    final pin = await _storage.getBiometricPin();
+    if (pin == null) {
+      throw Exception('Biometric unlock is not configured. Use your MPIN.');
+    }
+
+    await unlockWithPin(pin);
+    return true;
   }
 
   Future<void> unlockWithPin(String pin) async {
