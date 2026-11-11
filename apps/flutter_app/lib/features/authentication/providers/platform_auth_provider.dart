@@ -291,6 +291,8 @@ class PlatformAuthController extends ChangeNotifier {
       if (refreshToken != null) {
         await _service.logoutByRefreshToken(refreshToken);
       }
+    } catch (error) {
+      _errorMessage = _cleanError(error);
     } finally {
       await _storage.clearTokens();
       _setUnauthenticated();
