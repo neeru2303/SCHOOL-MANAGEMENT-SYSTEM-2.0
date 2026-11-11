@@ -15,6 +15,8 @@ import { PlatformAuthGuard } from './platform-auth.guard.js';
 import {
   PlatformLoginDto,
   PlatformRefreshTokenDto,
+  PlatformRememberDeviceDto,
+  PlatformDeviceUnlockDto,
 } from './dto/platform-auth.dto.js';
 
 interface PlatformRequest extends Request {
@@ -50,6 +52,29 @@ export class PlatformAuthController {
   ) {
     return this.platformAuthService.refresh(
       dto.refreshToken,
+    );
+  }
+
+  @Post('device/unlock')
+  async unlockDevice(@Body() dto: PlatformDeviceUnlockDto) {
+    return this.platformAuthService.unlockDevice(
+      dto.deviceKey,
+      dto.pin,
+      dto.refreshToken,
+    );
+  }
+
+  @UseGuards(PlatformAuthGuard)
+  @Post('device/remember')
+  async rememberDevice(
+    @Req() request: PlatformRequest,
+    @Body() dto: PlatformRememberDeviceDto,
+  ) {
+    return this.platformAuthService.rememberDevice(
+      request.user.userId,
+      request.user.sessionId,
+      dto.deviceKey,
+      dto.pin,
     );
   }
 
