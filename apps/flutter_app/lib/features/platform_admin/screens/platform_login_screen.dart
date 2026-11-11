@@ -25,7 +25,7 @@ class _PlatformLoginScreenState extends State<PlatformLoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _rememberMe = true;
+  bool _rememberMe = false;
   bool _isLoading = false;
 
   static const Color blue = Color(0xFF3B82F6);
@@ -42,11 +42,29 @@ class _PlatformLoginScreenState extends State<PlatformLoginScreen> {
       await PlatformAuthController.instance.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        rememberMe: _rememberMe,
       );
 
       if (!mounted) return;
 
+      if (_rememberMe) {
+        final pin = await _showMpinSetupDialog();
+        if (pin != null && mounted) {
+          try {
+            await PlatformAuthController.instance.rememberCurrentDevice(pin);
+          } catch (error) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Could not remember this device: $error'),
+                  backgroundColor: const Color(0xFFDC2626),
+                ),
+              );
+            }
+          }
+        }
+      }
+
+      if (!mounted) return;
       widget.onAuthenticated();
     } catch (error) {
       if (!mounted) return;
@@ -406,7 +424,7 @@ class _PlatformLoginScreenState extends State<PlatformLoginScreen> {
                     const SizedBox(width: 8),
 
                     const Text(
-                      'Remember me',
+                      'Remember this device',
                       style: TextStyle(color: Color(0xFFB7C8DC), fontSize: 12),
                     ),
 
