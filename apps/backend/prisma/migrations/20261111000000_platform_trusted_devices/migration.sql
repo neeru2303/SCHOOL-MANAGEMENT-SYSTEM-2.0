@@ -25,3 +25,8 @@ ALTER TABLE "PlatformTrustedDevice"
 ADD CONSTRAINT "PlatformTrustedDevice_userId_fkey"
 FOREIGN KEY ("userId") REFERENCES "User"("id")
 ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "PlatformTrustedDevice"
+ADD CONSTRAINT "PlatformTrustedDevice_sessionId_fkey"
+FOREIGN KEY ("sessionId") REFERENCES "AuthSession"("id")
+ON DELETE CASCADE ON UPDATE CASCADE;
