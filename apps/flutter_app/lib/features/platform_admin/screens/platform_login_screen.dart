@@ -42,6 +42,7 @@ class _PlatformLoginScreenState extends State<PlatformLoginScreen> {
       await PlatformAuthController.instance.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        deferAuthentication: true,
       );
 
       if (!mounted) return;
@@ -65,6 +66,7 @@ class _PlatformLoginScreenState extends State<PlatformLoginScreen> {
       }
 
       if (!mounted) return;
+      PlatformAuthController.instance.completeSignIn();
       widget.onAuthenticated();
     } catch (error) {
       if (!mounted) return;
