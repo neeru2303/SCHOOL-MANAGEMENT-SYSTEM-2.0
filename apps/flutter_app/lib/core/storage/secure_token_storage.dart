@@ -12,6 +12,8 @@ class SecureTokenStorage {
   static const _refreshTokenKey = 'platform_refresh_token';
   static const _rememberMeKey = 'platform_remember_me';
   static const _deviceKey = 'platform_trusted_device_key';
+  static const _biometricPinKey = 'platform_biometric_pin';
+  static const _biometricEnabledKey = 'platform_biometric_enabled';
 
   Future<void> saveTokens({
     required String accessToken,
@@ -54,6 +56,24 @@ class SecureTokenStorage {
     await preferences.setBool(_rememberMeKey, value);
   }
 
+  Future<void> saveBiometricPin(String pin) {
+    return _storage.write(key: _biometricPinKey, value: pin);
+  }
+
+  Future<String?> getBiometricPin() {
+    return _storage.read(key: _biometricPinKey);
+  }
+
+  Future<void> setBiometricEnabled(bool enabled) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_biometricEnabledKey, enabled);
+  }
+
+  Future<bool> shouldUseBiometrics() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getBool(_biometricEnabledKey) ?? false;
+  }
+
   Future<void> updateAccessToken(String token) {
     return _storage.write(key: _accessTokenKey, value: token);
   }
@@ -62,9 +82,11 @@ class SecureTokenStorage {
     await _storage.delete(key: _accessTokenKey);
     await _storage.delete(key: _refreshTokenKey);
     await _storage.delete(key: _deviceKey);
+    await _storage.delete(key: _biometricPinKey);
 
     final preferences = await SharedPreferences.getInstance();
 
     await preferences.remove(_rememberMeKey);
+    await preferences.remove(_biometricEnabledKey);
   }
 }
