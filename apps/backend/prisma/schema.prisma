@@ -72,6 +72,7 @@ model User {
   membership    SchoolMembership?
   sessions      AuthSession[]
   platformRoles PlatformUserRole[]
+  trustedDevices PlatformTrustedDevice[]
 }
 
 // ==========================================
@@ -334,4 +335,27 @@ model PlatformUserRole {
 
   @@id([userId, roleId])
   @@index([roleId])
+}
+
+
+// ==========================================
+// PLATFORM TRUSTED DEVICE
+// MPIN is a device unlock factor, never a replacement for the session token.
+// ==========================================
+model PlatformTrustedDevice {
+  id             String    @id @default(uuid()) @db.Uuid
+  deviceKey      String    @unique @db.VarChar(128)
+  userId         String    @db.Uuid
+  sessionId      String    @db.Uuid
+  pinHash        String
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([sessionId, revokedAt])
 }
