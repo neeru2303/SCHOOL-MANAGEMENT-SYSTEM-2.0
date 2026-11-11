@@ -65,6 +65,11 @@ export class PlatformAuthController {
     );
   }
 
+  @Post('logout-session')
+  async logoutByRefreshToken(@Body() dto: PlatformRefreshTokenDto) {
+    return this.platformAuthService.logoutByRefreshToken(dto.refreshToken);
+  }
+
   @Post('device/forget')
   async forgetDevice(@Body() dto: PlatformForgetDeviceDto) {
     return this.platformAuthService.forgetDevice(
