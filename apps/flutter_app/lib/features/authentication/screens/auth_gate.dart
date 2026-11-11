@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../providers/platform_auth_provider.dart';
 import '../../platform_admin/screens/platform_login_screen.dart';
 import '../../platform_admin/screens/platform_dashboard_screen.dart';
+import '../../platform_admin/screens/platform_unlock_screen.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -19,6 +20,9 @@ class AuthGate extends StatelessWidget {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
+
+          case PlatformAuthStatus.locked:
+            return const PlatformUnlockScreen();
 
           case PlatformAuthStatus.authenticated:
             return PlatformDashboardScreen(onLogout: controller.logout);
