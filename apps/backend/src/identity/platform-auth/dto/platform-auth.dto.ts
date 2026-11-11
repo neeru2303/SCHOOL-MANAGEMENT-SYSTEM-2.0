@@ -30,7 +30,7 @@ export class PlatformRememberDeviceDto {
   deviceKey!: string;
 
   @IsString()
-  @Matches(/^\\d{6}$/)
+  @Matches(/^\d{6}$/)
   pin!: string;
 }
 
@@ -41,7 +41,7 @@ export class PlatformDeviceUnlockDto {
   deviceKey!: string;
 
   @IsString()
-  @Matches(/^\\d{6}$/)
+  @Matches(/^\d{6}$/)
   pin!: string;
 
   @IsString()
