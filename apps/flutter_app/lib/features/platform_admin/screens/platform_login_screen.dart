@@ -143,7 +143,7 @@ class _PlatformLoginScreenState extends State<PlatformLoginScreen> {
                 FilledButton(
                   onPressed: () {
                     final pin = pinController.text;
-                    if (!RegExp(r'^\d{6}\$').hasMatch(pin)) {
+                    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
                       setDialogState(() => errorText = 'Enter exactly 6 digits.');
                       return;
                     }
