@@ -164,6 +164,20 @@ class PlatformAuthService {
     return _unwrap(_decode(response));
   }
 
+  Future<void> logoutByRefreshToken(String refreshToken) async {
+    final response = await _client.post(
+      _uri('/platform/auth/logout-session'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({'refreshToken': refreshToken}),
+    );
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(_errorMessage(response));
+    }
+  }
+
   Future<void> forgetDevice({
     required String deviceKey,
     required String refreshToken,
