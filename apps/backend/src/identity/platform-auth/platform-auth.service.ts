@@ -227,7 +227,7 @@ export class PlatformAuthService {
           );
         }
 
-        return tx.authSession.create({
+        const created = await tx.authSession.create({
           data: {
             userId: session.userId,
             refreshTokenHash:
@@ -236,6 +236,17 @@ export class PlatformAuthService {
             expiresAt: this.getRefreshExpiry(),
           },
         });
+
+        await tx.platformTrustedDevice.updateMany({
+          where: {
+            sessionId: session.id,
+            userId: session.userId,
+            revokedAt: null,
+          },
+          data: { sessionId: created.id },
+        });
+
+        return created;
       },
     );
 
@@ -263,7 +274,205 @@ export class PlatformAuthService {
     };
   }
 
+  async rememberDevice(
+    userId: string,
+    sessionId: string,
+    deviceKey: string,
+    pin: string,
+  ) {
+    const session = await this.prisma.authSession.findFirst({
+      where: {
+        id: sessionId,
+        userId,
+        sessionType: 'PLATFORM',
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!session) {
+      throw new UnauthorizedException('Your platform session is no longer valid.');
+    }
+
+    const existing = await this.prisma.platformTrustedDevice.findUnique({
+      where: { deviceKey },
+    });
+
+    if (existing && existing.userId !== userId) {
+      throw new UnauthorizedException('This device is already registered to another account.');
+    }
+
+    const pinHash = await this.passwordService.hashPassword(pin);
+
+    if (existing) {
+      await this.prisma.platformTrustedDevice.update({
+        where: { deviceKey },
+        data: {
+          sessionId,
+          pinHash,
+          failedAttempts: 0,
+          lockedUntil: null,
+          revokedAt: null,
+        },
+      });
+    } else {
+      await this.prisma.platformTrustedDevice.create({
+        data: { deviceKey, userId, sessionId, pinHash },
+      });
+    }
+
+    return { message: 'This device is now remembered.' };
+  }
+
+  async unlockDevice(
+    deviceKey: string,
+    pin: string,
+    refreshToken: string,
+  ) {
+    const device = await this.prisma.platformTrustedDevice.findUnique({
+      where: { deviceKey },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const session = await this.prisma.authSession.findFirst({
+      where: {
+        refreshTokenHash: tokenHash,
+        sessionType: 'PLATFORM',
+      },
+    });
+
+    const now = new Date();
+
+    if (
+      !device ||
+      !session ||
+      device.revokedAt ||
+      device.sessionId !== session.id ||
+      device.userId !== session.userId ||
+      session.revokedAt ||
+      session.expiresAt <= now ||
+      device.user.status !== 'ACTIVE'
+    ) {
+      throw new UnauthorizedException('This remembered session is no longer valid. Sign in with your email and password.');
+    }
+
+    if (device.lockedUntil && device.lockedUntil > now) {
+      throw new UnauthorizedException('MPIN is temporarily locked. Please try again later or sign in with your password.');
+    }
+
+    const validPin = await this.passwordService.verifyPassword(pin, device.pinHash);
+
+    if (!validPin) {
+      const failedAttempts = device.failedAttempts + 1;
+      await this.prisma.platformTrustedDevice.update({
+        where: { id: device.id },
+        data: {
+          failedAttempts,
+          lockedUntil: failedAttempts >= 5
+            ? new Date(now.getTime() + 15 * 60 * 1000)
+            : null,
+        },
+      });
+      throw new UnauthorizedException('Incorrect MPIN.');
+    }
+
+    const platformRole = await this.prisma.platformUserRole.findFirst({
+      where: {
+        userId: session.userId,
+        role: { is: { status: 'ACTIVE' } },
+      },
+      include: { role: true },
+    });
+
+    if (!platformRole) {
+      throw new UnauthorizedException('Platform access is no longer active.');
+    }
+
+    const newRefreshToken = this.generateRefreshToken();
+    const newSession = await this.prisma.$transaction(async (tx) => {
+      const revoked = await tx.authSession.updateMany({
+        where: {
+          id: session.id,
+          userId: session.userId,
+          sessionType: 'PLATFORM',
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { revokedAt: now, lastUsedAt: now },
+      });
+
+      if (revoked.count !== 1) {
+        throw new UnauthorizedException('This remembered session is no longer valid.');
+      }
+
+      const created = await tx.authSession.create({
+        data: {
+          userId: session.userId,
+          refreshTokenHash: this.hashRefreshToken(newRefreshToken),
+          sessionType: 'PLATFORM',
+          expiresAt: this.getRefreshExpiry(),
+        },
+      });
+
+      const updatedDevice = await tx.platformTrustedDevice.updateMany({
+        where: {
+          id: device.id,
+          sessionId: session.id,
+          revokedAt: null,
+        },
+        data: {
+          sessionId: created.id,
+          failedAttempts: 0,
+          lockedUntil: null,
+        },
+      });
+
+      if (updatedDevice.count !== 1) {
+        throw new UnauthorizedException('This remembered device is no longer valid.');
+      }
+
+      return created;
+    });
+
+    const accessToken = await this.generateAccessToken(
+      session.userId,
+      newSession.id,
+    );
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: this.accessTokenTtl,
+      user: {
+        id: device.user.id,
+        firstName: device.user.firstName,
+        lastName: device.user.lastName,
+        email: device.user.email,
+      },
+      role: {
+        code: platformRole.role.code,
+        name: platformRole.role.name,
+      },
+    };
+  }
+
   async logout(userId: string, sessionId: string) {
+    await this.prisma.platformTrustedDevice.updateMany({
+      where: { userId, sessionId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
     await this.prisma.authSession.updateMany({
       where: {
         id: sessionId,
