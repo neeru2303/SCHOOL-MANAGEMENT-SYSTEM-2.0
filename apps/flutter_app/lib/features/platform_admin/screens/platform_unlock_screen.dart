@@ -14,7 +14,7 @@ class _PlatformUnlockScreenState extends State<PlatformUnlockScreen> {
   bool _loading = false;
 
   Future<void> _unlock() async {
-    if (!RegExp(r'^\d{6}).hasMatch(_pinController.text)) {
+    if (!RegExp(r'^\d{6}$').hasMatch(_pinController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter your 6-digit MPIN.')),
       );
