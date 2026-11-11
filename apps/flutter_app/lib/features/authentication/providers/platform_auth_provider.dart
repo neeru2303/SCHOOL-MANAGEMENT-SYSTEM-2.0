@@ -170,8 +170,20 @@ class PlatformAuthController extends ChangeNotifier {
   }
 
   Future<void> forgetRememberedDevice() async {
-    await _storage.clearTokens();
-    _setUnauthenticated();
+    final deviceKey = await _storage.getTrustedDeviceKey();
+    final refreshToken = await _storage.getRefreshToken();
+
+    try {
+      if (deviceKey != null && refreshToken != null) {
+        await _service.forgetDevice(
+          deviceKey: deviceKey,
+          refreshToken: refreshToken,
+        );
+      }
+    } finally {
+      await _storage.clearTokens();
+      _setUnauthenticated();
+    }
   }
 
   // --------------------------------------------------
