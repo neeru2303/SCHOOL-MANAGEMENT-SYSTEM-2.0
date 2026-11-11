@@ -515,6 +515,35 @@ export class PlatformAuthService {
     return { message: 'Remembered device revoked. Sign in with your email and password.' };
   }
 
+  async logoutByRefreshToken(refreshToken: string) {
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const session = await this.prisma.authSession.findFirst({
+      where: {
+        refreshTokenHash: tokenHash,
+        sessionType: 'PLATFORM',
+        revokedAt: null,
+      },
+      select: { id: true, userId: true },
+    });
+
+    if (!session) {
+      return { message: 'Session already revoked or unavailable.' };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.platformTrustedDevice.updateMany({
+        where: { userId: session.userId, sessionId: session.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.authSession.updateMany({
+        where: { id: session.id, userId: session.userId, revokedAt: null },
+        data: { revokedAt: new Date(), lastUsedAt: new Date() },
+      });
+    });
+
+    return { message: 'Logged out successfully.' };
+  }
+
   async logout(userId: string, sessionId: string) {
     await this.prisma.platformTrustedDevice.updateMany({
       where: { userId, sessionId, revokedAt: null },
