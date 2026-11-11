@@ -1,10 +1,13 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/storage/secure_token_storage.dart';
 import '../models/platform_user.dart';
 import '../services/platform_auth_service.dart';
 
-enum PlatformAuthStatus { initializing, authenticated, unauthenticated }
+enum PlatformAuthStatus { initializing, locked, authenticated, unauthenticated }
 
 class PlatformAuthController extends ChangeNotifier {
   PlatformAuthController._();
@@ -36,48 +39,23 @@ class PlatformAuthController extends ChangeNotifier {
   Future<void> initialize() async {
     try {
       final rememberMe = await _storage.shouldRememberMe();
-
       if (!rememberMe) {
         await _storage.clearTokens();
         _setUnauthenticated();
         return;
       }
 
-      var accessToken = await _storage.getAccessToken();
-
-      if (accessToken == null) {
+      final deviceKey = await _storage.getTrustedDeviceKey();
+      final refreshToken = await _storage.getRefreshToken();
+      if (deviceKey == null || refreshToken == null) {
+        await _storage.clearTokens();
         _setUnauthenticated();
         return;
       }
 
-      try {
-        await _loadAndVerifyProfile(accessToken);
-      } catch (_) {
-        final refreshToken = await _storage.getRefreshToken();
-
-        if (refreshToken == null) {
-          throw Exception('Session expired.');
-        }
-
-        final response = await _service.refreshToken(refreshToken);
-
-        final newAccessToken = response['accessToken'];
-        final newRefreshToken = response['refreshToken'];
-
-        if (newAccessToken is! String || newRefreshToken is! String) {
-          throw Exception('Invalid refresh response.');
-        }
-
-        await _storage.saveTokens(
-          accessToken: newAccessToken,
-          refreshToken: newRefreshToken,
-          rememberMe: true,
-        );
-
-        accessToken = newAccessToken;
-
-        await _loadAndVerifyProfile(accessToken);
-      }
+      _user = null;
+      _status = PlatformAuthStatus.locked;
+      notifyListeners();
     } catch (_) {
       await _storage.clearTokens();
       _setUnauthenticated();
@@ -91,7 +69,6 @@ class PlatformAuthController extends ChangeNotifier {
   Future<void> signIn({
     required String email,
     required String password,
-    required bool rememberMe,
   }) async {
     _errorMessage = null;
 
@@ -108,7 +85,7 @@ class PlatformAuthController extends ChangeNotifier {
       await _storage.saveTokens(
         accessToken: accessToken,
         refreshToken: refreshToken,
-        rememberMe: rememberMe,
+        rememberMe: false,
       );
 
       await _loadAndVerifyProfile(accessToken);
@@ -121,6 +98,68 @@ class PlatformAuthController extends ChangeNotifier {
 
       rethrow;
     }
+  }
+
+  Future<void> rememberCurrentDevice(String pin) async {
+    final accessToken = await _storage.getAccessToken();
+    if (accessToken == null) {
+      throw Exception('Your login session is no longer available.');
+    }
+
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    final deviceKey = base64UrlEncode(bytes).replaceAll('=', '');
+
+    await _service.rememberDevice(
+      accessToken: accessToken,
+      deviceKey: deviceKey,
+      pin: pin,
+    );
+
+    await _storage.saveTrustedDeviceKey(deviceKey);
+    await _storage.setRememberMe(true);
+  }
+
+  Future<void> unlockWithPin(String pin) async {
+    _errorMessage = null;
+    try {
+      final deviceKey = await _storage.getTrustedDeviceKey();
+      final refreshToken = await _storage.getRefreshToken();
+      if (deviceKey == null || refreshToken == null) {
+        throw Exception('Remembered session not found. Sign in again.');
+      }
+
+      final response = await _service.unlockDevice(
+        deviceKey: deviceKey,
+        pin: pin,
+        refreshToken: refreshToken,
+      );
+
+      final accessToken = response['accessToken'];
+      final newRefreshToken = response['refreshToken'];
+      if (accessToken is! String || newRefreshToken is! String) {
+        throw Exception('The server returned an invalid unlock response.');
+      }
+
+      await _storage.saveTokens(
+        accessToken: accessToken,
+        refreshToken: newRefreshToken,
+        rememberMe: true,
+      );
+      await _loadAndVerifyProfile(accessToken);
+    } catch (error) {
+      _errorMessage = _cleanError(error);
+      if (_errorMessage!.contains('remembered session is no longer valid')) {
+        await _storage.clearTokens();
+        _setUnauthenticated();
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> forgetRememberedDevice() async {
+    await _storage.clearTokens();
+    _setUnauthenticated();
   }
 
   // --------------------------------------------------
