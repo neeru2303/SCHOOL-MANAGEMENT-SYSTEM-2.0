@@ -17,6 +17,7 @@ import {
   PlatformRefreshTokenDto,
   PlatformRememberDeviceDto,
   PlatformDeviceUnlockDto,
+  PlatformForgetDeviceDto,
 } from './dto/platform-auth.dto.js';
 
 interface PlatformRequest extends Request {
@@ -60,6 +61,14 @@ export class PlatformAuthController {
     return this.platformAuthService.unlockDevice(
       dto.deviceKey,
       dto.pin,
+      dto.refreshToken,
+    );
+  }
+
+  @Post('device/forget')
+  async forgetDevice(@Body() dto: PlatformForgetDeviceDto) {
+    return this.platformAuthService.forgetDevice(
+      dto.deviceKey,
       dto.refreshToken,
     );
   }
