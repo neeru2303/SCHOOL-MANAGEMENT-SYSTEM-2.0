@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsString,
   MaxLength,
+  Matches,
 } from 'class-validator';
 
 export class PlatformLoginDto {
@@ -19,5 +20,32 @@ export class PlatformLoginDto {
 export class PlatformRefreshTokenDto {
   @IsString()
   @IsNotEmpty()
+  refreshToken!: string;
+}
+
+export class PlatformRememberDeviceDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(128)
+  deviceKey!: string;
+
+  @IsString()
+  @Matches(/^\\d{6}$/)
+  pin!: string;
+}
+
+export class PlatformDeviceUnlockDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(128)
+  deviceKey!: string;
+
+  @IsString()
+  @Matches(/^\\d{6}$/)
+  pin!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(256)
   refreshToken!: string;
 }
