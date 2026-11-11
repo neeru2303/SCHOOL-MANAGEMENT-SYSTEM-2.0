@@ -11,6 +11,7 @@ class SecureTokenStorage {
   static const _accessTokenKey = 'platform_access_token';
   static const _refreshTokenKey = 'platform_refresh_token';
   static const _rememberMeKey = 'platform_remember_me';
+  static const _deviceKey = 'platform_trusted_device_key';
 
   Future<void> saveTokens({
     required String accessToken,
@@ -40,6 +41,19 @@ class SecureTokenStorage {
     return preferences.getBool(_rememberMeKey) ?? false;
   }
 
+  Future<void> saveTrustedDeviceKey(String deviceKey) {
+    return _storage.write(key: _deviceKey, value: deviceKey);
+  }
+
+  Future<String?> getTrustedDeviceKey() {
+    return _storage.read(key: _deviceKey);
+  }
+
+  Future<void> setRememberMe(bool value) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_rememberMeKey, value);
+  }
+
   Future<void> updateAccessToken(String token) {
     return _storage.write(key: _accessTokenKey, value: token);
   }
@@ -47,6 +61,7 @@ class SecureTokenStorage {
   Future<void> clearTokens() async {
     await _storage.delete(key: _accessTokenKey);
     await _storage.delete(key: _refreshTokenKey);
+    await _storage.delete(key: _deviceKey);
 
     final preferences = await SharedPreferences.getInstance();
 
