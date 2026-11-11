@@ -60,6 +60,10 @@ class SecureTokenStorage {
     return _storage.write(key: _biometricPinKey, value: pin);
   }
 
+  Future<void> deleteBiometricPin() {
+    return _storage.delete(key: _biometricPinKey);
+  }
+
   Future<String?> getBiometricPin() {
     return _storage.read(key: _biometricPinKey);
   }
