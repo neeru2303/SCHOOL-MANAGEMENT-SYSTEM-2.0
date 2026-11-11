@@ -51,7 +51,14 @@ class _PlatformLoginScreenState extends State<PlatformLoginScreen> {
         final pin = await _showMpinSetupDialog();
         if (pin != null && mounted) {
           try {
-            await PlatformAuthController.instance.rememberCurrentDevice(pin);
+            final authController = PlatformAuthController.instance;
+            final enableBiometrics = await authController.isBiometricAvailable()
+                ? await _showBiometricOptInDialog()
+                : false;
+            await authController.rememberCurrentDevice(
+              pin,
+              enableBiometrics: enableBiometrics,
+            );
           } catch (error) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
