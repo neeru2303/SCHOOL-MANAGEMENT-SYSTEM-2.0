@@ -164,6 +164,26 @@ class PlatformAuthService {
     return _unwrap(_decode(response));
   }
 
+  Future<void> forgetDevice({
+    required String deviceKey,
+    required String refreshToken,
+  }) async {
+    final response = await _client.post(
+      _uri('/platform/auth/device/forget'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'deviceKey': deviceKey,
+        'refreshToken': refreshToken,
+      }),
+    );
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(_errorMessage(response));
+    }
+  }
+
   // --------------------------------------------------
   // LOGOUT
   // --------------------------------------------------
