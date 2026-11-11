@@ -374,16 +374,19 @@ export class PlatformAuthService {
     const validPin = await this.passwordService.verifyPassword(pin, device.pinHash);
 
     if (!validPin) {
-      const failedAttempts = device.failedAttempts + 1;
-      await this.prisma.platformTrustedDevice.update({
+      const failed = await this.prisma.platformTrustedDevice.update({
         where: { id: device.id },
-        data: {
-          failedAttempts,
-          lockedUntil: failedAttempts >= 5
-            ? new Date(now.getTime() + 15 * 60 * 1000)
-            : null,
-        },
+        data: { failedAttempts: { increment: 1 } },
       });
+
+      if (failed.failedAttempts >= 5) {
+        await this.prisma.platformTrustedDevice.update({
+          where: { id: device.id },
+          data: {
+            lockedUntil: new Date(now.getTime() + 15 * 60 * 1000),
+          },
+        });
+      }
       throw new UnauthorizedException('Incorrect MPIN.');
     }
 
