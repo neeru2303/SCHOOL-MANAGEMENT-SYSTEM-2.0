@@ -69,6 +69,7 @@ class PlatformAuthController extends ChangeNotifier {
   Future<void> signIn({
     required String email,
     required String password,
+    bool deferAuthentication = false,
   }) async {
     _errorMessage = null;
 
@@ -88,7 +89,10 @@ class PlatformAuthController extends ChangeNotifier {
         rememberMe: false,
       );
 
-      await _loadAndVerifyProfile(accessToken);
+      await _loadAndVerifyProfile(
+        accessToken,
+        activate: !deferAuthentication,
+      );
     } catch (error) {
       await _storage.clearTokens();
 
@@ -98,6 +102,14 @@ class PlatformAuthController extends ChangeNotifier {
 
       rethrow;
     }
+  }
+
+  void completeSignIn() {
+    if (_user == null) {
+      throw StateError('Sign-in has not been verified.');
+    }
+    _status = PlatformAuthStatus.authenticated;
+    notifyListeners();
   }
 
   Future<void> rememberCurrentDevice(String pin) async {
@@ -166,7 +178,10 @@ class PlatformAuthController extends ChangeNotifier {
   // VERIFY SUPER ADMIN
   // --------------------------------------------------
 
-  Future<void> _loadAndVerifyProfile(String accessToken) async {
+  Future<void> _loadAndVerifyProfile(
+    String accessToken, {
+    bool activate = true,
+  }) async {
     final response = await _service.getProfile(accessToken);
 
     final profileData = response['user'] is Map<String, dynamic>
@@ -185,9 +200,10 @@ class PlatformAuthController extends ChangeNotifier {
 
     _user = user;
     _errorMessage = null;
-    _status = PlatformAuthStatus.authenticated;
-
-    notifyListeners();
+    if (activate) {
+      _status = PlatformAuthStatus.authenticated;
+      notifyListeners();
+    }
   }
 
   // --------------------------------------------------
