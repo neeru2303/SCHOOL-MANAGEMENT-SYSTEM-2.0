@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../core/navigation/platform_admin_navigation.dart';
 
 class PlatformDashboardScreen extends StatefulWidget {
   const PlatformDashboardScreen({super.key, required this.onLogout});
@@ -14,42 +15,21 @@ class PlatformDashboardScreen extends StatefulWidget {
 }
 
 class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
-  int selectedIndex = 0;
+  String selectedPage = 'dashboard';
 
-  String selectedSchool = 'All Schools';
-  String selectedAcademicSession = '2026-27';
+  PlatformNavItem get currentPage =>
+      PlatformAdminNavigation.findById(selectedPage);
 
-  bool isRefreshing = false;
+  void _navigate(String pageId) {
+    setState(() => selectedPage = pageId);
 
-  final List<_NavigationItem> navigationItems = [
-    _NavigationItem(title: 'Overview', icon: Icons.dashboard_rounded),
-    _NavigationItem(title: 'School Management', icon: Icons.apartment_rounded),
-    _NavigationItem(title: 'Platform Users', icon: Icons.people_alt_rounded),
-    _NavigationItem(
-      title: 'Roles & Permissions',
-      icon: Icons.admin_panel_settings_rounded,
-    ),
-    _NavigationItem(title: 'Audit Logs', icon: Icons.history_rounded),
-    _NavigationItem(title: 'System Health', icon: Icons.monitor_heart_rounded),
-    _NavigationItem(title: 'Platform Settings', icon: Icons.settings_rounded),
-  ];
-
-  Future<void> _refreshDashboard() async {
-    setState(() => isRefreshing = true);
-
-    // Backend dashboard API will be connected here.
-
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    if (mounted) {
-      setState(() => isRefreshing = false);
+    if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
+      Navigator.of(context).pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 1100;
@@ -58,29 +38,31 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
         return Scaffold(
           drawer: isDesktop
               ? null
-              : Drawer(width: 270, child: _buildSidebar(isDark)),
-          body: Row(
-            children: [
-              if (isDesktop) SizedBox(width: 260, child: _buildSidebar(isDark)),
-              Expanded(
-                child: Column(
-                  children: [
-                    _buildTopBar(context, isDesktop, isTablet, isDark),
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _refreshDashboard,
+              : Drawer(width: 285, child: _buildSidebar(isDrawer: true)),
+          body: SafeArea(
+            top: true,
+            bottom: false,
+            child: Row(
+              children: [
+                if (isDesktop)
+                  SizedBox(width: 265, child: _buildSidebar(isDrawer: false)),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _buildTopBar(isDesktop: isDesktop, isTablet: isTablet),
+                      Expanded(
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 250),
-                          child: selectedIndex == 0
-                              ? _buildOverview(context, isTablet, isDark)
-                              : _buildPlaceholderPage(context, isDark),
+                          child: selectedPage == 'dashboard'
+                              ? _buildDashboardOverview(isTablet)
+                              : _buildModulePage(),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -91,193 +73,187 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
   // SIDEBAR
   // --------------------------------------------------
 
-  Widget _buildSidebar(bool isDark) {
+  Widget _buildSidebar({required bool isDrawer}) {
     return Container(
       color: const Color(0xFF102957),
       child: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 25, 15, 25),
-              child: Row(
+            _buildBrand(),
+
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 15),
                 children: [
-                  Container(
-                    height: 44,
-                    width: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: const Icon(
-                      Icons.school_rounded,
-                      color: Colors.white,
-                      size: 27,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'SCHOOL ERP',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        SizedBox(height: 3),
-                        Text(
-                          'Platform Administration',
-                          style: TextStyle(
-                            color: Color(0xFFB9C9E5),
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  for (final group in PlatformAdminNavigation.allGroups) ...[
+                    _buildGroupTitle(group.title),
+                    const SizedBox(height: 7),
+                    for (final item in group.items)
+                      _buildNavigationItem(item, isDrawer: isDrawer),
+                    const SizedBox(height: 15),
+                  ],
                 ],
               ),
             ),
 
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 5, 15, 12),
-              child: Text(
-                'MAIN MENU',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: navigationItems.length,
-                itemBuilder: (context, index) {
-                  final item = navigationItems[index];
-                  final selected = selectedIndex == index;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 5),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () {
-                        setState(() => selectedIndex = index);
-
-                        if (Scaffold.of(context).hasDrawer) {
-                          Navigator.maybePop(context);
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 13,
-                          vertical: 13,
-                        ),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? const Color(0xFF3B82F6)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              item.icon,
-                              color: selected
-                                  ? Colors.white
-                                  : const Color(0xFFB9C9E5),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 13),
-                            Expanded(
-                              child: Text(
-                                item.title,
-                                style: TextStyle(
-                                  color: selected
-                                      ? Colors.white
-                                      : const Color(0xFFD5E0F2),
-                                  fontSize: 12,
-                                  fontWeight: selected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                            if (selected)
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                padding: const EdgeInsets.all(13),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: const Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: Color(0xFFF59E0B),
-                      child: Icon(
-                        Icons.person_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Super Admin',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Platform Administrator',
-                            style: TextStyle(
-                              color: Color(0xFFB9C9E5),
-                              fontSize: 9,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _buildAdminProfile(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBrand() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 23, 15, 25),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: const Icon(
+              Icons.school_rounded,
+              color: Colors.white,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SCHOOL ERP',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Platform Administration',
+                  style: TextStyle(color: Color(0xFFB9C9E5), fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 5),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.48),
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.3,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavigationItem(PlatformNavItem item, {required bool isDrawer}) {
+    final selected = selectedPage == item.id;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Material(
+        color: selected ? const Color(0xFF3B82F6) : Colors.transparent,
+        borderRadius: BorderRadius.circular(9),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(9),
+          onTap: () {
+            setState(() => selectedPage = item.id);
+
+            if (isDrawer) {
+              Navigator.of(context).pop();
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            child: Row(
+              children: [
+                Icon(
+                  item.icon,
+                  size: 19,
+                  color: selected ? Colors.white : const Color(0xFFB9C9E5),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    style: TextStyle(
+                      color: selected ? Colors.white : const Color(0xFFD5E0F2),
+                      fontSize: 11,
+                      fontWeight: selected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ),
+                if (selected)
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 17,
+                    color: Colors.white,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminProfile() {
+    return Container(
+      margin: const EdgeInsets.all(13),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: const Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: Color(0xFFF59E0B),
+            child: Icon(Icons.person_rounded, color: Colors.white),
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Super Admin',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'Platform Administrator',
+                  style: TextStyle(color: Color(0xFFB9C9E5), fontSize: 9),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -286,15 +262,10 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
   // TOP BAR
   // --------------------------------------------------
 
-  Widget _buildTopBar(
-    BuildContext context,
-    bool isDesktop,
-    bool isTablet,
-    bool isDark,
-  ) {
+  Widget _buildTopBar({required bool isDesktop, required bool isTablet}) {
     return Container(
       height: 76,
-      padding: EdgeInsets.symmetric(horizontal: isTablet ? 28 : 15),
+      padding: EdgeInsets.symmetric(horizontal: isTablet ? 27 : 13),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         border: Border(
@@ -305,10 +276,14 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
         children: [
           if (!isDesktop)
             Builder(
-              builder: (context) => IconButton(
-                onPressed: () => Scaffold.of(context).openDrawer(),
-                icon: const Icon(Icons.menu_rounded),
-              ),
+              builder: (context) {
+                return IconButton(
+                  onPressed: () {
+                    Scaffold.of(context).openDrawer();
+                  },
+                  icon: const Icon(Icons.menu_rounded),
+                );
+              },
             ),
 
           Expanded(
@@ -317,9 +292,9 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  navigationItems[selectedIndex].title,
+                  currentPage.title,
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -327,7 +302,7 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
                 Text(
                   'Platform control centre',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     color: Theme.of(context).textTheme.bodySmall?.color,
                   ),
                 ),
@@ -335,19 +310,10 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
             ),
           ),
 
-          if (isDesktop || isTablet) ...[
-            _buildSchoolSelector(context),
-            const SizedBox(width: 10),
-            _buildAcademicSessionSelector(context),
-            const SizedBox(width: 10),
-          ],
-
           PopupMenuButton<ThemeMode>(
-            tooltip: 'Change appearance',
+            tooltip: 'Appearance',
             icon: const Icon(Icons.palette_outlined),
-            onSelected: (mode) {
-              ThemeController.instance.setThemeMode(mode);
-            },
+            onSelected: ThemeController.instance.setThemeMode,
             itemBuilder: (context) => const [
               PopupMenuItem(value: ThemeMode.light, child: Text('Light theme')),
               PopupMenuItem(value: ThemeMode.dark, child: Text('Dark theme')),
@@ -361,21 +327,20 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
           IconButton(
             tooltip: 'Notifications',
             onPressed: () {
-              _showMessage(context, 'Notifications will be connected later.');
+              _showMessage(
+                'Notification integration will be implemented later.',
+              );
             },
             icon: const Icon(Icons.notifications_none_rounded),
           ),
 
           PopupMenuButton<String>(
             tooltip: 'Account',
-            icon: const CircleAvatar(
-              radius: 16,
-              backgroundColor: Color(0xFF1E3A8A),
-              child: Icon(Icons.person, size: 18, color: Colors.white),
-            ),
             onSelected: (value) async {
               if (value == 'logout') {
                 await widget.onLogout();
+              } else if (value == 'profile') {
+                _navigate('profile');
               }
             },
             itemBuilder: (context) => const [
@@ -385,76 +350,23 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
                 child: Row(
                   children: [
                     Icon(Icons.logout_rounded, size: 18),
-                    SizedBox(width: 10),
+                    SizedBox(width: 9),
                     Text('Logout'),
                   ],
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSchoolSelector(BuildContext context) {
-    return _selector(
-      context,
-      icon: Icons.apartment_rounded,
-      value: selectedSchool,
-      items: const ['All Schools', 'Sandipani Academy'],
-      onChanged: (value) {
-        setState(() {
-          selectedSchool = value!;
-        });
-      },
-    );
-  }
-
-  Widget _buildAcademicSessionSelector(BuildContext context) {
-    return _selector(
-      context,
-      icon: Icons.calendar_month_rounded,
-      value: selectedAcademicSession,
-      items: const ['2025-26', '2026-27', '2027-28'],
-      onChanged: (value) {
-        setState(() {
-          selectedAcademicSession = value!;
-        });
-      },
-    );
-  }
-
-  Widget _selector(
-    BuildContext context, {
-    required IconData icon,
-    required String value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.symmetric(horizontal: 9),
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 15),
-          const SizedBox(width: 5),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: value,
-              isDense: true,
-              iconSize: 17,
-              items: items.map((item) {
-                return DropdownMenuItem(
-                  value: item,
-                  child: Text(item, style: const TextStyle(fontSize: 11)),
-                );
-              }).toList(),
-              onChanged: onChanged,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: Color(0xFF1E3A8A),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
             ),
           ),
         ],
@@ -463,118 +375,133 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
   }
 
   // --------------------------------------------------
-  // OVERVIEW
+  // DASHBOARD OVERVIEW
   // --------------------------------------------------
 
-  Widget _buildOverview(BuildContext context, bool isTablet, bool isDark) {
-    final width = MediaQuery.of(context).size.width;
+  Widget _buildDashboardOverview(bool isTablet) {
+    return LayoutBuilder(
+      key: const ValueKey('dashboard'),
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 1250
+            ? 4
+            : constraints.maxWidth >= 650
+            ? 2
+            : 1;
 
-    final columns = width >= 1300
-        ? 4
-        : width >= 800
-        ? 2
-        : 1;
+        return RefreshIndicator(
+          onRefresh: _refreshDashboard,
+          child: ListView(
+            padding: EdgeInsets.all(isTablet ? 27 : 16),
+            children: [
+              _buildWelcomeBanner(),
 
-    return ListView(
-      key: const ValueKey('overview'),
-      padding: EdgeInsets.all(isTablet ? 28 : 16),
-      children: [
-        _buildWelcomeSection(context),
+              const SizedBox(height: 20),
 
-        const SizedBox(height: 22),
+              _buildSampleDataNotice(),
 
-        _buildSampleDataNotice(context),
+              const SizedBox(height: 25),
 
-        const SizedBox(height: 22),
+              _buildSectionHeading(
+                'Platform Overview',
+                'Lifetime platform statistics',
+              ),
 
-        _buildSectionTitle(
-          context,
-          'Platform Overview',
-          'Lifetime platform statistics',
-        ),
+              const SizedBox(height: 14),
 
-        const SizedBox(height: 15),
+              GridView.count(
+                crossAxisCount: columns,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+                childAspectRatio: columns == 1 ? 3.0 : 1.8,
+                children: const [
+                  _MetricCard(
+                    title: 'Registered Schools',
+                    value: '248',
+                    subtitle: 'All-time registrations',
+                    icon: Icons.apartment_rounded,
+                    color: Color(0xFF3B82F6),
+                  ),
+                  _MetricCard(
+                    title: 'Active Schools',
+                    value: '221',
+                    subtitle: 'Currently active',
+                    icon: Icons.check_circle_rounded,
+                    color: Color(0xFF16A34A),
+                  ),
+                  _MetricCard(
+                    title: 'Suspended Schools',
+                    value: '12',
+                    subtitle: 'Currently suspended',
+                    icon: Icons.pause_circle_rounded,
+                    color: Color(0xFFF59E0B),
+                  ),
+                  _MetricCard(
+                    title: 'Platform Users',
+                    value: '36',
+                    subtitle: 'Platform administrators',
+                    icon: Icons.people_alt_rounded,
+                    color: Color(0xFF8B5CF6),
+                  ),
+                ],
+              ),
 
-        GridView.count(
-          crossAxisCount: columns,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 15,
-          mainAxisSpacing: 15,
-          childAspectRatio: width >= 1300
-              ? 1.8
-              : width >= 800
-              ? 2.0
-              : 2.5,
-          children: const [
-            _MetricCard(
-              title: 'Total Registered Schools',
-              value: '248',
-              subtitle: 'All-time registrations',
-              icon: Icons.apartment_rounded,
-              color: Color(0xFF3B82F6),
-            ),
-            _MetricCard(
-              title: 'Active Schools',
-              value: '221',
-              subtitle: 'Currently active',
-              icon: Icons.check_circle_rounded,
-              color: Color(0xFF16A34A),
-            ),
-            _MetricCard(
-              title: 'Suspended Schools',
-              value: '12',
-              subtitle: 'Currently suspended',
-              icon: Icons.pause_circle_rounded,
-              color: Color(0xFFF59E0B),
-            ),
-            _MetricCard(
-              title: 'Platform Users',
-              value: '36',
-              subtitle: 'Platform administrators',
-              icon: Icons.people_alt_rounded,
-              color: Color(0xFF8B5CF6),
-            ),
-          ],
-        ),
+              const SizedBox(height: 27),
 
-        const SizedBox(height: 28),
+              _buildSectionHeading(
+                'Quick Actions',
+                'Frequently used platform operations',
+              ),
 
-        _buildSectionTitle(
-          context,
-          'Registration Analytics',
-          'Illustrative monthly school registrations',
-        ),
+              const SizedBox(height: 14),
 
-        const SizedBox(height: 15),
+              _buildQuickActions(),
 
-        _buildRegistrationChart(context),
+              const SizedBox(height: 27),
 
-        const SizedBox(height: 28),
+              _buildSectionHeading(
+                'Registration Analytics',
+                'Illustrative monthly school registrations',
+              ),
 
-        _buildSectionTitle(
-          context,
-          'Recent Platform Activity',
-          'Latest administrative events',
-        ),
+              const SizedBox(height: 14),
 
-        const SizedBox(height: 15),
+              _buildRegistrationChart(),
 
-        _buildRecentActivity(context),
+              const SizedBox(height: 27),
 
-        const SizedBox(height: 25),
-      ],
+              _buildSectionHeading(
+                'Recent Platform Activity',
+                'Illustrative administrative events',
+              ),
+
+              const SizedBox(height: 14),
+
+              _buildRecentActivity(),
+
+              const SizedBox(height: 27),
+
+              _buildSectionHeading('System Monitoring', 'Integration status'),
+
+              const SizedBox(height: 14),
+
+              _buildSystemMonitoring(),
+
+              const SizedBox(height: 25),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildWelcomeSection(BuildContext context) {
+  Widget _buildWelcomeBanner() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -594,29 +521,29 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
                 ),
                 const SizedBox(height: 9),
                 Text(
-                  'Monitor schools, manage platform users, '
-                  'and control your School ERP ecosystem.',
+                  'Manage schools, platform users, permissions '
+                  'and the entire School ERP ecosystem.',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 12,
                     height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 17),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 9,
+                    horizontal: 12,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(7),
                   ),
                   child: const Text(
                     'PLATFORM ADMINISTRATION',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1,
                     ),
@@ -636,7 +563,7 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
     );
   }
 
-  Widget _buildSampleDataNotice(BuildContext context) {
+  Widget _buildSampleDataNotice() {
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
@@ -650,8 +577,8 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Preview mode: All dashboard figures and activity '
-              'are sample data, not live platform records.',
+              'Preview mode: Statistics and activity shown here '
+              'are illustrative sample data, not live records.',
               style: TextStyle(color: Color(0xFF805B19), fontSize: 11),
             ),
           ),
@@ -660,11 +587,7 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
     );
   }
 
-  Widget _buildSectionTitle(
-    BuildContext context,
-    String title,
-    String subtitle,
-  ) {
+  Widget _buildSectionHeading(String title, String subtitle) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -676,7 +599,7 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
         Text(
           subtitle,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 10,
             color: Theme.of(context).textTheme.bodySmall?.color,
           ),
         ),
@@ -685,11 +608,86 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
   }
 
   // --------------------------------------------------
+  // QUICK ACTIONS
+  // --------------------------------------------------
+
+  Widget _buildQuickActions() {
+    final actions = [
+      (
+        'Register School',
+        Icons.add_business_rounded,
+        'register_school',
+        const Color(0xFF3B82F6),
+      ),
+      (
+        'View Schools',
+        Icons.apartment_rounded,
+        'schools',
+        const Color(0xFF16A34A),
+      ),
+      (
+        'Manage Users',
+        Icons.people_alt_rounded,
+        'users',
+        const Color(0xFF8B5CF6),
+      ),
+      (
+        'Audit Logs',
+        Icons.history_rounded,
+        'audit_logs',
+        const Color(0xFFF59E0B),
+      ),
+    ];
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: actions.map((action) {
+        return SizedBox(
+          width: 190,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _navigate(action.$3),
+            child: Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 19,
+                    backgroundColor: action.$4.withValues(alpha: 0.12),
+                    child: Icon(action.$2, size: 19, color: action.$4),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      action.$1,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded, size: 12),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // --------------------------------------------------
   // REGISTRATION CHART
   // --------------------------------------------------
 
-  Widget _buildRegistrationChart(BuildContext context) {
-    final months = [
+  Widget _buildRegistrationChart() {
+    const months = [
       ('Jan', 12),
       ('Feb', 18),
       ('Mar', 15),
@@ -705,15 +703,15 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
     ];
 
     return Container(
-      height: 265,
+      height: 260,
       padding: const EdgeInsets.fromLTRB(18, 20, 18, 12),
-      decoration: _cardDecoration(context),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'New School Registrations',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 18),
           Expanded(
@@ -728,10 +726,7 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
                       children: [
                         Text(
                           '${month.$2}',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: const TextStyle(fontSize: 9),
                         ),
                         const SizedBox(height: 5),
                         Expanded(
@@ -741,14 +736,14 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
                               heightFactor: month.$2 / 50,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF3B82F6),
+                                  color: AppColors.primaryLight,
                                   borderRadius: BorderRadius.circular(5),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 7),
                         Text(month.$1, style: const TextStyle(fontSize: 9)),
                       ],
                     ),
@@ -766,40 +761,40 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
   // RECENT ACTIVITY
   // --------------------------------------------------
 
-  Widget _buildRecentActivity(BuildContext context) {
+  Widget _buildRecentActivity() {
     final activities = [
       (
         'New school registered',
         'Green Valley Public School',
-        'Today, 10:30 AM',
+        'Sample event',
         Icons.add_business_rounded,
         const Color(0xFF16A34A),
       ),
       (
         'School status updated',
         'ABC International School',
-        'Yesterday, 3:45 PM',
+        'Sample event',
         Icons.edit_rounded,
         const Color(0xFF3B82F6),
       ),
       (
         'Platform user created',
         'New administrator account',
-        'Yesterday, 11:20 AM',
+        'Sample event',
         Icons.person_add_alt_rounded,
         const Color(0xFF8B5CF6),
       ),
       (
         'School suspended',
         'Demo Public School',
-        '06 Nov, 2:15 PM',
+        'Sample event',
         Icons.pause_circle_outline_rounded,
         const Color(0xFFF59E0B),
       ),
     ];
 
     return Container(
-      decoration: _cardDecoration(context),
+      decoration: _cardDecoration(),
       child: Column(
         children: activities.map((activity) {
           return ListTile(
@@ -823,35 +818,90 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
   }
 
   // --------------------------------------------------
-  // PLACEHOLDER PAGES
+  // SYSTEM MONITORING
   // --------------------------------------------------
 
-  Widget _buildPlaceholderPage(BuildContext context, bool isDark) {
-    return Center(
-      key: ValueKey(selectedIndex),
-      child: Padding(
-        padding: const EdgeInsets.all(25),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              navigationItems[selectedIndex].icon,
-              size: 65,
-              color: AppColors.primaryLight,
+  Widget _buildSystemMonitoring() {
+    return Container(
+      padding: const EdgeInsets.all(17),
+      decoration: _cardDecoration(),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: AppColors.primaryLight),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'System monitoring integration is pending. '
+              'Live service health will appear here after '
+              'the monitoring APIs are implemented.',
+              style: TextStyle(fontSize: 11, height: 1.5),
             ),
-            const SizedBox(height: 18),
-            Text(
-              navigationItems[selectedIndex].title,
-              style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'This module will be implemented in the next phase.',
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+
+  // --------------------------------------------------
+  // MODULE LANDING PAGES
+  // --------------------------------------------------
+
+  Widget _buildModulePage() {
+    return ListView(
+      key: ValueKey(selectedPage),
+      padding: const EdgeInsets.all(25),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(25),
+          decoration: _cardDecoration(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 27,
+                backgroundColor: AppColors.primaryLight.withValues(alpha: 0.12),
+                child: Icon(
+                  currentPage.icon,
+                  size: 27,
+                  color: AppColors.primaryLight,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                currentPage.title,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                currentPage.description,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+              ),
+              const SizedBox(height: 22),
+              const Divider(),
+              const SizedBox(height: 15),
+              const Text(
+                'Module implementation pending',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'The navigation is ready. This module will be '
+                'implemented with its own Flutter screens, '
+                'NestJS APIs, permission checks and database '
+                'operations. No sample operation is presented '
+                'as a real administrative action.',
+                style: TextStyle(fontSize: 12, height: 1.6),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -859,7 +909,7 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
   // HELPERS
   // --------------------------------------------------
 
-  BoxDecoration _cardDecoration(BuildContext context) {
+  BoxDecoration _cardDecoration() {
     return BoxDecoration(
       color: Theme.of(context).cardColor,
       borderRadius: BorderRadius.circular(13),
@@ -867,7 +917,12 @@ class _PlatformDashboardScreenState extends State<PlatformDashboardScreen> {
     );
   }
 
-  void _showMessage(BuildContext context, String message) {
+  Future<void> _refreshDashboard() async {
+    // Live dashboard API will be connected in a later phase.
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
+
+  void _showMessage(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
   }
@@ -934,15 +989,4 @@ class _MetricCard extends StatelessWidget {
       ),
     );
   }
-}
-
-// --------------------------------------------------
-// NAVIGATION MODEL
-// --------------------------------------------------
-
-class _NavigationItem {
-  const _NavigationItem({required this.title, required this.icon});
-
-  final String title;
-  final IconData icon;
 }

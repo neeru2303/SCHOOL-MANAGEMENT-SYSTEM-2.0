@@ -8,7 +8,6 @@ class PlatformAuthService {
 
   final http.Client _client;
 
-  // Override this using --dart-define when running the application.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://localhost:3000/api/v1',
@@ -41,7 +40,6 @@ class PlatformAuthService {
   String _errorMessage(http.Response response) {
     try {
       final body = _decode(response);
-
       final message = body['message'];
 
       if (message is List) {
@@ -57,6 +55,10 @@ class PlatformAuthService {
 
     return 'Request failed (${response.statusCode}).';
   }
+
+  // --------------------------------------------------
+  // LOGIN
+  // --------------------------------------------------
 
   Future<Map<String, dynamic>> login({
     required String email,
@@ -78,6 +80,10 @@ class PlatformAuthService {
     return _unwrap(_decode(response));
   }
 
+  // --------------------------------------------------
+  // GET PROFILE
+  // --------------------------------------------------
+
   Future<Map<String, dynamic>> getProfile(String accessToken) async {
     final response = await _client.get(
       _uri('/platform/auth/me'),
@@ -93,6 +99,10 @@ class PlatformAuthService {
 
     return _unwrap(_decode(response));
   }
+
+  // --------------------------------------------------
+  // REFRESH TOKEN
+  // --------------------------------------------------
 
   Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
     final response = await _client.post(
@@ -111,14 +121,17 @@ class PlatformAuthService {
     return _unwrap(_decode(response));
   }
 
-  Future<void> logout(String refreshToken) async {
+  // --------------------------------------------------
+  // LOGOUT
+  // --------------------------------------------------
+
+  Future<void> logout(String accessToken) async {
     final response = await _client.post(
       _uri('/platform/auth/logout'),
       headers: {
-        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
         'Accept': 'application/json',
       },
-      body: jsonEncode({'refreshToken': refreshToken}),
     );
 
     if (response.statusCode != 200 &&

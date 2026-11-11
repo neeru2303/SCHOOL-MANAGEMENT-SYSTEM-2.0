@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../providers/platform_auth_provider.dart';
-import 'login_screen.dart';
+import '../../platform_admin/screens/platform_login_screen.dart';
 import '../../platform_admin/screens/platform_dashboard_screen.dart';
 
 class AuthGate extends StatelessWidget {
@@ -24,7 +24,7 @@ class AuthGate extends StatelessWidget {
             return PlatformDashboardScreen(onLogout: controller.logout);
 
           case PlatformAuthStatus.unauthenticated:
-            return const LoginScreen();
+            return PlatformLoginScreen(onAuthenticated: () {});
         }
       },
     );

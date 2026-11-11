@@ -156,11 +156,11 @@ class PlatformAuthController extends ChangeNotifier {
   // --------------------------------------------------
 
   Future<void> logout() async {
-    final refreshToken = await _storage.getRefreshToken();
+    final accessToken = await _storage.getAccessToken();
 
     try {
-      if (refreshToken != null) {
-        await _service.logout(refreshToken);
+      if (accessToken != null) {
+        await _service.logout(accessToken);
       }
     } finally {
       await _storage.clearTokens();
