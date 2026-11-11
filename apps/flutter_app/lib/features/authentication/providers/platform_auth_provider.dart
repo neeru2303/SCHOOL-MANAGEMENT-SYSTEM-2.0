@@ -218,7 +218,10 @@ class PlatformAuthController extends ChangeNotifier {
       await _loadAndVerifyProfile(accessToken);
     } catch (error) {
       _errorMessage = _cleanError(error);
-      if (_errorMessage!.contains('remembered session is no longer valid')) {
+      final normalizedError = _errorMessage!.toLowerCase();
+      if (normalizedError.contains('remembered session is no longer valid') ||
+          normalizedError.contains('remembered device not found') ||
+          normalizedError.contains('invalid or expired refresh token')) {
         await _storage.clearTokens();
         _setUnauthenticated();
       }
@@ -237,6 +240,8 @@ class PlatformAuthController extends ChangeNotifier {
           refreshToken: refreshToken,
         );
       }
+    } catch (error) {
+      _errorMessage = _cleanError(error);
     } finally {
       await _storage.clearTokens();
       _setUnauthenticated();
