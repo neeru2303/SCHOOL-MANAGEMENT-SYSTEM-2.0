@@ -49,3 +49,15 @@ export class PlatformDeviceUnlockDto {
   @MaxLength(256)
   refreshToken!: string;
 }
+
+export class PlatformForgetDeviceDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(128)
+  deviceKey!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(256)
+  refreshToken!: string;
+}
