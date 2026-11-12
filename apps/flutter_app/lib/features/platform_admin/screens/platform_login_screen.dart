@@ -97,6 +97,33 @@ class _PlatformLoginScreenState extends State<PlatformLoginScreen> {
   }
 
 
+  Future<bool> _showBiometricOptInDialog() async {
+    final enable = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Enable biometric unlock?'),
+          content: const Text(
+            'Use your device fingerprint or face authentication to unlock '
+            'this remembered device. You can still use your 6-digit MPIN.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Enable'),
+            ),
+          ],
+        );
+      },
+    );
+    return enable ?? false;
+  }
+
   Future<String?> _showMpinSetupDialog() async {
     final pinController = TextEditingController();
     final confirmController = TextEditingController();
