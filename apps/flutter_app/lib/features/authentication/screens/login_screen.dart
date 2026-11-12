@@ -74,7 +74,6 @@ class _LoginScreenState extends State<LoginScreen>
       await PlatformAuthController.instance.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        rememberMe: _rememberMe,
       );
 
       // AuthGate automatically opens the dashboard
